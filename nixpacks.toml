@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["python311", "gcc", "g++", "make"]
+nixPkgs = ["python311", "gcc", "g++", "make", "libglib", "nss", "atk", "cups", "pango"]
 
 [phases.install]
 cmds = [
