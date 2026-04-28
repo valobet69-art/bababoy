@@ -1,63 +1,82 @@
-import time
-import requests
 import os
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
+import time
+import hashlib
+import requests
+from playwright.sync_api import sync_playwright
 
-CPF = "09081684620"
+CPF = "71877568600"
 NF = "3306097"
 
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
 URL = "https://www.braspress.com/acesso-rapido/rastreie-sua-encomenda/"
 
-def send_discord(msg):
-    requests.post(WEBHOOK_URL, json={"content": msg})
+def send(msg):
+    if WEBHOOK_URL:
+        requests.post(WEBHOOK_URL, json={"content": msg})
 
-def create_driver():
-    options = Options()
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
+def hash_text(text):
+    return hashlib.md5(text.encode()).hexdigest()
 
-    driver = webdriver.Chrome(options=options)
-    return driver
+def run_check(page):
+    page.goto(URL, timeout=60000)
+    page.wait_for_timeout(5000)
 
-def get_status(driver):
-    driver.get(URL)
-    time.sleep(5)
+    # tenta preencher campos
+    try:
+        page.fill('input[name="cpf"]', CPF)
+        page.fill('input[name="nota"]', NF)
+    except:
+        return "❌ Não conseguiu encontrar campos de CPF/NF (site mudou layout)"
 
-    cpf_input = driver.find_element(By.NAME, "cpf")
-    nf_input = driver.find_element(By.NAME, "nota")
+    # clicar buscar
+    try:
+        page.click("button")
+    except:
+        return "❌ Botão de busca não encontrado"
 
-    cpf_input.send_keys(CPF)
-    nf_input.send_keys(NF)
+    page.wait_for_timeout(7000)
 
-    driver.find_element(By.XPATH, "//button").click()
+    content = page.inner_text("body")
 
-    time.sleep(6)
+    # valida se realmente pesquisou certo
+    if CPF not in content and NF not in content:
+        return "⚠️ Página carregou, mas não parece ter processado a busca corretamente"
 
-    return driver.find_element(By.TAG_NAME, "body").text
+    # detecta erro comum
+    if "não encontrado" in content.lower():
+        return "📭 Pedido não encontrado no sistema"
+
+    return content
+
 
 def main():
-    driver = create_driver()
-    last = ""
+    send("🤖 Bot Braspress iniciado (monitoramento ativo)")
 
-    send_discord("🤖 Bot de rastreio iniciado no Railway!")
+    last_hash = ""
 
-    while True:
-        try:
-            status = get_status(driver)
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
 
-            if status != last:
-                last = status
-                send_discord("📦 Atualização:\n" + status)
+        while True:
+            try:
+                result = run_check(page)
+                h = hash_text(result)
 
-        except Exception as e:
-            send_discord(f"❌ Erro: {e}")
+                if h != last_hash:
+                    last_hash = h
 
-        time.sleep(60)
+                    send("📦 🔔 Atualização detectada no rastreio:\n\n" + result)
+
+                else:
+                    print("Sem mudanças...")
+
+            except Exception as e:
+                send(f"❌ Erro no bot: {str(e)}")
+
+            time.sleep(60)
+
 
 if __name__ == "__main__":
     main()
