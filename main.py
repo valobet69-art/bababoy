@@ -12,6 +12,10 @@ WEBHOOK_MUDO1 = os.getenv("WEBHOOK_MUDO1")
 
 URL = "https://www.braspress.com/acesso-rapido/rastreie-sua-encomenda/"
 
+# 🔥 controle anti-spam (importante no Railway)
+started = False
+
+
 def send(webhook, msg):
     if webhook:
         try:
@@ -19,10 +23,11 @@ def send(webhook, msg):
         except:
             pass
 
+
 def hash_text(text):
     return hashlib.md5(text.encode()).hexdigest()
 
-# 🔥 PEGA SÓ O QUE INTERESSA (EVITA MUDANÇA FALSA)
+
 def extract_tracking_text(content):
     lines = content.split("\n")
 
@@ -30,7 +35,6 @@ def extract_tracking_text(content):
     for line in lines:
         line = line.strip().lower()
 
-        # remove lixo do site
         if any(x in line for x in [
             "braspress",
             "cookie",
@@ -45,6 +49,7 @@ def extract_tracking_text(content):
             filtered.append(line)
 
     return "\n".join(filtered)
+
 
 def run_check(page):
     page.goto(URL, timeout=60000)
@@ -72,8 +77,12 @@ def run_check(page):
 
 
 def main():
-    send(WEBHOOK_GENERAL, "🟢 Bot iniciado e ONLINE no Railway")
-    send(WEBHOOK_MUDO1, "📡 Bot iniciou e está monitorando rastreio...")
+    global started
+
+    # 🟢 só 1 vez mesmo se reiniciar container
+    if not started:
+        send(WEBHOOK_GENERAL, "🟢 Bot iniciado e ONLINE no Railway")
+        started = True
 
     last_hash = ""
     last_ping = time.time()
@@ -96,7 +105,7 @@ def main():
                 result = run_check(page)
                 h = hash_text(result)
 
-                # 📦 SÓ MUDA SE MUDAR O RASTREIO REAL
+                # 📦 só manda se mudou MESMO
                 if h != last_hash:
                     last_hash = h
                     send(WEBHOOK_MUDO1, "📦 🔔 ALTERAÇÃO DETECTADA:\n\n" + result)
