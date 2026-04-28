@@ -14,7 +14,10 @@ URL = "https://www.braspress.com/acesso-rapido/rastreie-sua-encomenda/"
 
 def send(webhook, msg):
     if webhook:
-        requests.post(webhook, json={"content": msg})
+        try:
+            requests.post(webhook, json={"content": msg})
+        except:
+            pass
 
 def hash_text(text):
     return hashlib.md5(text.encode()).hexdigest()
@@ -45,13 +48,23 @@ def run_check(page):
 
 
 def main():
-    send(WEBHOOK_GENERAL, "🟢 Bot iniciado e online no Railway")
+    send(WEBHOOK_GENERAL, "🟢 Bot iniciado e ONLINE no Railway")
 
     last_hash = ""
     last_ping = time.time()
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+
+        # 🔥 CORREÇÃO IMPORTANTE PRO RAILWAY
+        browser = p.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu"
+            ]
+        )
+
         page = browser.new_page()
 
         while True:
@@ -59,18 +72,24 @@ def main():
                 result = run_check(page)
                 h = hash_text(result)
 
-                # 📦 mudança real
+                # 📦 mudou rastreio
                 if h != last_hash:
                     last_hash = h
-                    send(WEBHOOK_MUDO1, "📦 🔔 ALTERAÇÃO DETECTADA:\n\n" + result)
+                    send(
+                        WEBHOOK_MUDO1,
+                        "📦 🔔 ALTERAÇÃO DETECTADA:\n\n" + result
+                    )
 
-                # 🟢 heartbeat geral
+                # 🟢 heartbeat
                 if time.time() - last_ping > 300:
-                    send(WEBHOOK_GENERAL, "🟢 Bot online e monitorando rastreio...")
+                    send(
+                        WEBHOOK_GENERAL,
+                        "🟢 Bot ainda ONLINE e monitorando rastreio..."
+                    )
                     last_ping = time.time()
 
             except Exception as e:
-                send(WEBHOOK_GENERAL, f"❌ erro: {str(e)}")
+                send(WEBHOOK_GENERAL, f"❌ erro no bot: {str(e)}")
 
             time.sleep(60)
 
