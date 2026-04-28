@@ -48,14 +48,17 @@ def run_check(page):
 
 
 def main():
+    # 🟢 aviso inicial geral
     send(WEBHOOK_GENERAL, "🟢 Bot iniciado e ONLINE no Railway")
+
+    # 📦 mensagem única no canal de mudanças
+    send(WEBHOOK_MUDO1, "📡 Bot iniciou e está enviando atualizações do rastreio...")
 
     last_hash = ""
     last_ping = time.time()
 
     with sync_playwright() as p:
 
-        # 🔥 CORREÇÃO IMPORTANTE PRO RAILWAY
         browser = p.chromium.launch(
             headless=True,
             args=[
@@ -72,20 +75,14 @@ def main():
                 result = run_check(page)
                 h = hash_text(result)
 
-                # 📦 mudou rastreio
+                # 📦 só quando mudar mesmo
                 if h != last_hash:
                     last_hash = h
-                    send(
-                        WEBHOOK_MUDO1,
-                        "📦 🔔 ALTERAÇÃO DETECTADA:\n\n" + result
-                    )
+                    send(WEBHOOK_MUDO1, "📦 🔔 ALTERAÇÃO DETECTADA:\n\n" + result)
 
-                # 🟢 heartbeat
+                # 🟢 heartbeat infinito no geral
                 if time.time() - last_ping > 300:
-                    send(
-                        WEBHOOK_GENERAL,
-                        "🟢 Bot ainda ONLINE e monitorando rastreio..."
-                    )
+                    send(WEBHOOK_GENERAL, "🟢 Bot ainda ONLINE e monitorando rastreio...")
                     last_ping = time.time()
 
             except Exception as e:
