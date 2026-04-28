@@ -7,13 +7,14 @@ from playwright.sync_api import sync_playwright
 CPF = "71877568600"
 NF = "3306097"
 
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+WEBHOOK_GENERAL = os.getenv("WEBHOOK_GENERAL")
+WEBHOOK_MUDO1 = os.getenv("WEBHOOK_MUDO1")
 
 URL = "https://www.braspress.com/acesso-rapido/rastreie-sua-encomenda/"
 
-def send(msg):
-    if WEBHOOK_URL:
-        requests.post(WEBHOOK_URL, json={"content": msg})
+def send(webhook, msg):
+    if webhook:
+        requests.post(webhook, json={"content": msg})
 
 def hash_text(text):
     return hashlib.md5(text.encode()).hexdigest()
@@ -22,38 +23,32 @@ def run_check(page):
     page.goto(URL, timeout=60000)
     page.wait_for_timeout(5000)
 
-    # tenta preencher campos
     try:
         page.fill('input[name="cpf"]', CPF)
         page.fill('input[name="nota"]', NF)
     except:
-        return "❌ Não conseguiu encontrar campos de CPF/NF (site mudou layout)"
+        return "❌ site mudou (não achou campos)"
 
-    # clicar buscar
     try:
         page.click("button")
     except:
-        return "❌ Botão de busca não encontrado"
+        return "❌ botão de busca não encontrado"
 
     page.wait_for_timeout(7000)
 
     content = page.inner_text("body")
 
-    # valida se realmente pesquisou certo
-    if CPF not in content and NF not in content:
-        return "⚠️ Página carregou, mas não parece ter processado a busca corretamente"
-
-    # detecta erro comum
     if "não encontrado" in content.lower():
-        return "📭 Pedido não encontrado no sistema"
+        return "📭 pedido não encontrado"
 
     return content
 
 
 def main():
-    send("🤖 Bot Braspress iniciado (monitoramento ativo)")
+    send(WEBHOOK_GENERAL, "🟢 Bot iniciado e online no Railway")
 
     last_hash = ""
+    last_ping = time.time()
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -64,16 +59,18 @@ def main():
                 result = run_check(page)
                 h = hash_text(result)
 
+                # 📦 mudança real
                 if h != last_hash:
                     last_hash = h
+                    send(WEBHOOK_MUDO1, "📦 🔔 ALTERAÇÃO DETECTADA:\n\n" + result)
 
-                    send("📦 🔔 Atualização detectada no rastreio:\n\n" + result)
-
-                else:
-                    print("Sem mudanças...")
+                # 🟢 heartbeat geral
+                if time.time() - last_ping > 300:
+                    send(WEBHOOK_GENERAL, "🟢 Bot online e monitorando rastreio...")
+                    last_ping = time.time()
 
             except Exception as e:
-                send(f"❌ Erro no bot: {str(e)}")
+                send(WEBHOOK_GENERAL, f"❌ erro: {str(e)}")
 
             time.sleep(60)
 
