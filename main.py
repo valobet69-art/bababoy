@@ -22,6 +22,30 @@ def send(webhook, msg):
 def hash_text(text):
     return hashlib.md5(text.encode()).hexdigest()
 
+# 🔥 PEGA SÓ O QUE INTERESSA (EVITA MUDANÇA FALSA)
+def extract_tracking_text(content):
+    lines = content.split("\n")
+
+    filtered = []
+    for line in lines:
+        line = line.strip().lower()
+
+        # remove lixo do site
+        if any(x in line for x in [
+            "braspress",
+            "cookie",
+            "privacidade",
+            "menu",
+            "login",
+            "home"
+        ]):
+            continue
+
+        if len(line) > 3:
+            filtered.append(line)
+
+    return "\n".join(filtered)
+
 def run_check(page):
     page.goto(URL, timeout=60000)
     page.wait_for_timeout(5000)
@@ -44,15 +68,12 @@ def run_check(page):
     if "não encontrado" in content.lower():
         return "📭 pedido não encontrado"
 
-    return content
+    return extract_tracking_text(content)
 
 
 def main():
-    # 🟢 aviso inicial geral
     send(WEBHOOK_GENERAL, "🟢 Bot iniciado e ONLINE no Railway")
-
-    # 📦 mensagem única no canal de mudanças
-    send(WEBHOOK_MUDO1, "📡 Bot iniciou e está enviando atualizações do rastreio...")
+    send(WEBHOOK_MUDO1, "📡 Bot iniciou e está monitorando rastreio...")
 
     last_hash = ""
     last_ping = time.time()
@@ -75,12 +96,12 @@ def main():
                 result = run_check(page)
                 h = hash_text(result)
 
-                # 📦 só quando mudar mesmo
+                # 📦 SÓ MUDA SE MUDAR O RASTREIO REAL
                 if h != last_hash:
                     last_hash = h
                     send(WEBHOOK_MUDO1, "📦 🔔 ALTERAÇÃO DETECTADA:\n\n" + result)
 
-                # 🟢 heartbeat infinito no geral
+                # 🟢 heartbeat só no geral
                 if time.time() - last_ping > 300:
                     send(WEBHOOK_GENERAL, "🟢 Bot ainda ONLINE e monitorando rastreio...")
                     last_ping = time.time()
